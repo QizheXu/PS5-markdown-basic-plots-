@@ -1,0 +1,375 @@
+---
+title: 'INFO201 Problem Set: rmarkdown and plotting'
+output: html_document
+author: "Qizhe Xu"
+date: "2023-02-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Section 1. Load and check data
+
+1. For solving the problems, and answering the questions, create a new rmarkdown document with an appropriate title.
+
+Done
+
+2. Load data. How many rows/columns do we have?
+
+```{r}
+library(tidyverse)
+gapminder<-read.delim("gapminder.csv")
+dim(gapminder)
+```
+There are 13055 rows and 25 columns in the dataset.
+
+3. Print a small sample of data. Does it look OK?
+
+```{r}
+gapminder%>%sample_n(6)
+```
+The sample looks ok.
+
+# Descriptive statistics
+
+1. How many countries are there in the dataset? Analyze all three: iso3, iso2 and name.
+
+```{r}
+gapminder%>%
+  group_by(iso3)%>%
+  n_groups()
+
+gapminder%>%
+  group_by(iso2)%>%
+  n_groups()
+
+gapminder%>%
+  group_by(name)%>%
+  n_groups()
+```
+
+There are 253, 249 and 250 countries from variables iso3, iso2 and name, respectively.
+
+2. If you did this correctly, you saw that there are more names than iso-2 codes, and there are
+even more iso3 -codes. What is going on? Can you find it out?
+
+(a) Find how many names are there for each iso-2 code. Are there any iso-2 codes that correspond to more than one name? What are these countries?
+
+Answer: 
+
+```{r}
+gapminder%>%
+  group_by(iso2)%>%
+  summarize(n=n_distinct(name))%>%
+  arrange(desc(n))%>%
+  top_n(5)
+```
+We can see that the iso2 with blank code has two different names. Now, we check the names:
+
+```{r}
+gapminder%>%
+  filter(iso2=="")%>%
+  group_by(name)%>%
+  summarize(n=n())
+```
+
+We can see for the blank iso2 code, the corresponding name is blank or "Namibia".
+
+(b). Now repeat the same for name and iso3-code. Are there country names that have
+more than one iso3-code? What are these countries?
+
+Answer:
+
+```{r}
+gapminder%>%
+  group_by(name)%>%
+  summarize(n=n_distinct(iso3))%>%
+  arrange(desc(n))%>%
+  top_n(5)
+
+gapminder%>%
+  filter(name=="")%>%
+  group_by(iso3)%>%
+  count()
+```
+
+We can see the name with blank code has more than one iso3 code. These countries are CHANISL, GBM, KOS and NLD_CURACAO.
+
+3. What is the minimum and maximum year in these data?
+
+Answer:
+
+```{r}
+min(gapminder$time,na.rm = TRUE)
+max(gapminder$time,na.rm = TRUE)
+```
+The minimum and maximum year in these data is 1960 and 2019, respectively.
+
+
+# CO2 emissions
+
+Next, let’s analyze CO2 emissions.
+1. (2pt) How many missing co2 emissions are there for each year? Analyze both missing CO2 and co2_PC. Which years have most missing data?
+
+Answer: 
+
+```{r}
+gapminder%>%
+  group_by(time)%>%
+  summarize(n_missing_co2=sum(is.na(co2)))%>%
+  arrange(desc(n_missing_co2))
+
+gapminder%>%
+  group_by(time)%>%
+  summarize(n_missing_co2_PC=sum(is.na(co2_PC)))%>%
+  arrange(desc(n_missing_co2_PC))
+
+```
+We can see year 2017, 2018 and 2019 have most missing data.
+
+2. Make a plot of total CO2 emissions over time for the U.S, China, and India. Add a few
+more countries of your choice. Explain what do you see.
+
+```{r}
+CO2_country<-gapminder%>%
+      filter(iso3%in%c("CHN","RUS","IDN","USA","JPN","DEU"))%>%
+      group_by(iso3,time)%>%
+      summarize(total_co2=sum(co2))
+
+ggplot(CO2_country,aes(x=time,y=total_co2,color=iso3))+
+  geom_line()
+```
+
+We can see China's CO2 emissions increased rapidly after 2000, with its rapid development in economic. Russia's co2 emission dropped significant from 1989. Indian's CO2 emission increased but still in low level, comparing with China and USA. USA's co2 emission is in the trend of decreasing.
+
+3. Now let’s analyze the CO2 emissions per capita (co2_PC). Make a similar plot of the
+same countries. What does this figure suggest?
+
+```{r}
+CO2_country<-gapminder%>%
+      filter(iso3%in%c("CHN","RUS","IDN","USA","JPN","DEU"))%>%
+      group_by(iso3,time)%>%
+      summarize(total_co2_PC=sum(co2_PC))
+
+ggplot(CO2_country,aes(x=time,y=total_co2_PC,color=iso3))+
+  geom_line()
+
+```
+
+From the figure, we can see China's co2 emission per capita is still in low level when comparing with the other developed countries. USA's co2 emission per capita is stable in the recently 50 years. From 2010, it is in a decreasing trend but still in high level.
+
+4. Compute average CO2 emissions per capita across the continents (assume region is the
+same as continent). Comment what do you see.
+
+```{r}
+gapminder%>%
+      group_by(region)%>%
+      summarize(avg_co2_PC=mean(co2_PC,na.rm = TRUE))
+
+```
+
+We can see Africa has the least average CO2 emission and Americas has the most.
+
+5. Make a barplot where you show the previous results–average CO2 emissions per capita
+across continents in 1960 and 2016.
+
+```{r}
+data1<-gapminder%>%filter(time%in%c(1960,2016))%>%
+  group_by(region, time)%>%
+  summarize(avg_co2_PC=mean(co2_PC,na.rm = TRUE))%>%
+  filter(!is.na(region)&region!="")%>%
+  mutate(time=as.factor(time))
+
+ggplot(data1,aes(x=region,y=avg_co2_PC, fill=time,colour=time))+
+  geom_bar(stat = "identity", position = "dodge")+
+  xlab("Continent")+ylab("Average CO2 per capita")
+```
+
+
+6. Which countries are the three largest, and three smallest CO2 emitters (in terms of CO2 per
+capita) in 2019 for each continent?
+
+Answer: After checking the dataset, we can see all of values in the CO2_PC variable are missing for year 2019. We change the year from 2019 to 2016.
+
+```{r}
+gapminder%>%filter(time==2016)%>%
+  group_by(region,name)%>%
+      summarize(avg_co2_PC=mean(co2_PC,na.rm = TRUE))%>%
+  filter(name!="")%>%
+  group_by(region)%>%
+  arrange(desc(avg_co2_PC))%>%
+  top_n(3)%>%
+  arrange(region)%>%
+  print(n=100)
+```
+
+Now, we print the least 3 countries for each region.
+
+
+```{r}
+gapminder%>%filter(time==2016)%>%
+  group_by(region,name)%>%
+      summarize(avg_co2_PC=mean(co2_PC,na.rm = TRUE))%>%
+  filter(name!="")%>%
+  group_by(region)%>%
+  arrange(avg_co2_PC)%>%
+  top_n(3)%>%
+  arrange(region)%>%
+  print(n=100)
+```
+
+# GDP per capita
+
+1. Make a scatterplot of GDP per capita versus life expectancy by country, using data for
+1960. Make the point size dependent on the country size, and color those according to the
+continent. Feel free to adjust the plot in other ways to make it better.
+Comment what do you see there.
+
+```{r}
+data2<-gapminder%>%
+  filter(time==1960)
+
+
+  ggplot(data=data2,aes(x=GDP_PC,y=lifeExpectancy,colour=region))+
+  geom_point()
+```
+
+Comments: 
+
+- GDP per capita and life expectancy has positive relationship. A country has a higher GDP is more likely to have higher life expectancy.
+
+- Africa coutnries have low GDP and low life expectancy. 
+
+- Europe countries have high GDP and high life expectancy. 
+
+2. Make a similar plot, but this time use 2019 data only.
+
+
+```{r}
+data3<-gapminder%>%
+  filter(time==2019)
+
+
+  ggplot(data=data3,aes(x=GDP_PC,y=lifeExpectancy,colour=region))+
+  geom_point()
+```
+
+
+3. Compare these two plots and comment what do you see. How has world developed
+through the last 60 years?
+
+Answer: 
+
+- Through 60 years' development, the life expectancy is significant increased for all countries.
+
+- The GDP per capita increased significant in the past 60 years.
+
+- Europe is still the region with high GDP per capita and high life expectancy.
+
+4. Compute the average life expectancy for each continent in 1960 and 2019. Do the results
+fit with what do you see on the figures?
+
+```{r}
+
+gapminder%>%
+  filter(time%in%c(1960, 2019))%>%
+  filter(region!="")%>%
+  group_by(region)%>%
+  summarize(avg_life=mean(lifeExpectancy,na.rm = TRUE))%>%
+  arrange(desc(avg_life))
+```
+
+The result is aligned with our findings in the figure.
+
+5. Compute the average LE growth from 1960-2019 across the continents. Show the results
+in the order of growth. Explain what do you see.
+
+Answer:
+
+```{r}
+gapminder%>%
+  mutate(prev=lag(lifeExpectancy),
+         growth=lifeExpectancy-prev)%>%
+  filter(!is.na(region)&region!="")%>%
+  group_by(region)%>%
+  summarize(avg_growth=mean(growth,na.rm = TRUE))%>%
+  arrange(desc(avg_growth))
+  
+```
+
+We can see Europe has the highest life expectany from 1960 to 2019.
+
+6. Show the histogram of GDP per capita for years of 1960 and 2019. Try to put both
+histograms on the same graph, see how well you can do it!
+
+Answer:
+
+```{r}
+data3<-gapminder%>%
+  filter(time %in% c(1960, 2019))%>%
+  filter(!is.na(region)&region!="")
+
+ggplot(data = data3, aes(x=GDP_PC,fill=region))+
+  geom_histogram(alpha=0.5, position="identity",bins=10)+
+  facet_grid()
+
+```
+
+7. What was the ranking of US in terms of life expectancy in 1960 and in 2019?
+
+```{r}
+gapminder%>%
+  filter(time==1960)%>%
+  filter(!is.na(name)&name!="")%>%
+  arrange(desc(lifeExpectancy))%>%
+  select(name,lifeExpectancy)%>%
+  top_n(20)
+
+```
+
+From the above results, we can see in 1960, US is the 17th country in terms of life expectancy. Now, we check for 2019,
+
+```{r}
+gapminder%>%
+  filter(time==2019)%>%
+  filter(!is.na(name)&name!="")%>%
+  arrange(desc(lifeExpectancy))%>%
+  select(name,lifeExpectancy)%>%
+  top_n(50)
+
+```
+
+In 2019, US's rank is 46th.
+
+
+8. If you did this correctly, then you noticed that US ranking has been falling quite a
+bit. But we also have more countries in 2019–what about the relative rank divided by the
+corresponding number of countries that have LE data in the corresponding year?
+
+Answer:
+
+```{r}
+gapminder%>%
+  filter(time==1960)%>%
+  filter(!is.na(name)&name!="")%>%
+  filter(!is.na(lifeExpectancy))%>%
+  nrow()
+
+17/188
+```
+In 1960, the relative rank is 0.0904. In 2019, we have the relative rank as following:
+
+```{r}
+gapminder%>%
+  filter(time==2019)%>%
+  filter(!is.na(name)&name!="")%>%
+  filter(!is.na(lifeExpectancy))%>%
+  nrow()
+
+46/196
+```
+
+In 2019, the relative rank is 0.2347.
+
+Finally, there are 5 hours I spend in this assignment.
